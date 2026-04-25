@@ -1,14 +1,15 @@
 from skopt import BayesSearchCV
 from sklearn.model_selection import train_test_split
-from skopt.space import Real, Categorical, Integer
+from skopt.space import Real, Integer
 from xgboost import XGBClassifier
 from model import Model
 import pandas as pd
-import numpy as np
 from sklearn.pipeline import Pipeline
-from src.transformers import Preprocessor, FeatureEngineer
+from transformers import Preprocessor, FeatureEngineer
 from sklearn.metrics import roc_auc_score, recall_score, confusion_matrix, precision_score, f1_score
+import os
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def evaluate_model(model, X_test, y_test, model_name="Model", threshold=0.39):
     y_probs = model.predict_proba(X_test)
@@ -46,7 +47,9 @@ def evaluate_model(model, X_test, y_test, model_name="Model", threshold=0.39):
     print("=" * 50)
 
 def run_training():
-    df = pd.read_csv("../../data/raw/cs-training.csv")
+    data_path = os.path.join(BASE_DIR, "data", "raw", "cs-training.csv")
+
+    df = pd.read_csv(data_path)
     df = df.drop(columns=["Unnamed: 0"])
 
     X, y = df.drop('SeriousDlqin2yrs', axis=1), df['SeriousDlqin2yrs']
@@ -89,9 +92,13 @@ def run_training():
     final_model = Model(pipeline=opt.best_estimator_)
     final_model.train_final(X_train, y_train)
 
-    final_model.save_model('trained_models/xgb_model.joblib')
-    evaluate_model(final_model, X_test, y_test, model_name='xgb_model', threshold=0.39)
+    model_save_dir = os.path.join(BASE_DIR, "models")
+    os.makedirs(model_save_dir, exist_ok=True)
 
+    model_save_path = os.path.join(model_save_dir, "xgb_model.joblib")
+    final_model.save_model(model_save_path)
+
+    evaluate_model(final_model, X_test, y_test, model_name='xgb_model', threshold=0.39)
 
 if __name__ == "__main__":
     run_training()

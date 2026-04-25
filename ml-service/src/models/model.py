@@ -14,7 +14,7 @@ class Model:
     def predict_proba(self, X):
         return self.pipeline.predict_proba(X)[:, 1]
 
-    def predict(self, X, threshold=0.59):
+    def predict(self, X, threshold=0.39):
         probabilities = self.predict_proba(X)
         return (probabilities > threshold).astype(int)
 
