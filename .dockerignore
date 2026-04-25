@@ -4,8 +4,8 @@ __pycache__/
 *.pkl
 *.ipynb
 
-data/
-models/
+ml-service/data/
+ml-service/models/
 
 .git/
 .gitignore
