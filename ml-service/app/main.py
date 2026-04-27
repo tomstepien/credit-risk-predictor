@@ -11,6 +11,7 @@ import src.models.predict as predict_module
 from contextlib import asynccontextmanager
 from typing import Optional
 import uvicorn
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 model_pipeline: Optional[Model] = None

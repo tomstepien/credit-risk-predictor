@@ -1,5 +1,4 @@
 import pandas as pd
-from models.model import Model
 import os
 from src.models.model import Model
 
