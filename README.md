@@ -36,8 +36,8 @@ The development process was preceded by an in-depth data exploration phase. This
 - [x] Building a RESTful Inference API with **FastAPI** and **Pydantic** validation.
 
 ### 🔵 Sprint 2: Business Logic & Persistence (Kotlin) - IN PROGRESS 🏗️
-- [ ] **Current:** Initializing **Spring Boot 3** project with Kotlin.
-- [ ] Designing the PostgreSQL schema and JPA Entities.
+- [x] **Current:** Initializing **Spring Boot 3** project with Kotlin.
+- [x] Designing the PostgreSQL schema and JPA Entities.
 - [ ] Implementing the `MLClient` to communicate with the FastAPI service.
 
 ### 🟡 Sprint 3: Infrastructure & UX (DevOps & React) - PLANNED 📅
@@ -46,20 +46,54 @@ The development process was preceded by an in-depth data exploration phase. This
 - [ ] **Frontend:** Building a React + TypeScript dashboard for real-time risk simulation.
 ---
 
-## 🚀 Getting Started (ML Service Only)
+## 🚀 Getting Started (Integrated Backend & ML)
 
-Currently, you can run and test the ML inference engine independently.
+The easiest way to run the entire ecosystem (Kotlin Backend, Python ML Service, and PostgreSQL) is via Docker Compose.
 
-### Installation
-1. Run the following commands
-    ```bash
-   cd ml-service
-   pip install -r requirements.txt
-   uvicorn app.main:app --reload
-    ```
-   
-2. Access the API:
-   Open `http://localhost:8000/docs` in your browser.
+### Quick Start
+1. Ensure you have Docker installed.
+2. From the project root, run:
+   ```bash
+   docker-compose up --build
+   ```
 
+### 🧪 Testing the API
+Now you can test the full integration flow: Client -> Kotlin Backend -> Python ML -> PostgreSQL.
 
+#### Full Integration Test (via Postman)
+   Use this endpoint to trigger the entire logic. The Kotlin backend will call the ML engine and persist the results in the database.
 
+- Open **Postman** and create a new ```POST``` request
+
+- **URL**: ```http://localhost:8080/api/credit/applications/predict```
+
+- In the **Body** tab, select **raw** and choose **JSON**.
+
+- **Example Payload (JSON)**:
+
+```json
+{
+   "RevolvingUtilizationOfUnsecuredLines": 0.35,
+   "age": 45,
+   "NumberOfTime30-59DaysPastDueNotWorse": 1,
+   "NumberOfTime60-89DaysPastDueNotWorse": 0,
+   "NumberOfTimes90DaysLate": 0,
+   "DebtRatio": 0.4,
+   "MonthlyIncome": 5500.0,
+   "NumberOfOpenCreditLinesAndLoans": 12,
+   "NumberRealEstateLoansOrLines": 1,
+   "NumberOfDependents": 2
+}
+```
+
+#### Database & History Verification
+   Verify that the data has been correctly saved and processed:
+
+- **All Applications**: ```GET http://localhost:8080/api/credit/applications/all```
+
+- **All Decisions**: ```GET http://localhost:8080/api/credit/decisions/all```
+
+#### Independent ML Testing (Swagger)
+   To test the Python ML engine independently (bypassing the Kotlin backend)
+
+- **Swagger UI URL**: ```http://localhost:8000/docs```
