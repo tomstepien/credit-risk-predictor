@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:15
+    container_name: credit-db
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    ports:
+      - "5435:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  ml-service:
+    build: ./ml-service
+    container_name: ml-api
+    ports:
+      - "8000:8000"
+
+  backend-service:
+    build: ./backend-service
+    container_name: spring-api
+    depends_on:
+      - db
+      - ml-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - ML_SERVICE_URL=http://ml-api:8000
+
+volumes:
+  db_data:
