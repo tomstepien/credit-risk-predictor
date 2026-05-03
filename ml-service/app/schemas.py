@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class CreditApplication(BaseModel):
-    credit_application_id: str
+    credit_application_id: str = Field(alias="creditApplicationId")
     revolving_utilization: float = Field(alias="RevolvingUtilizationOfUnsecuredLines")
     age: int
     past_due_30_59: int = Field(alias="NumberOfTime30-59DaysPastDueNotWorse")
