@@ -8,7 +8,6 @@ import com.creditrisk.model.DecisionEntity
 import com.creditrisk.model.DecisionResponse
 import jakarta.persistence.EntityNotFoundException
 import jakarta.transaction.Transactional
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import java.time.LocalDateTime
@@ -17,17 +16,10 @@ import java.time.LocalDateTime
 class CreditApplicationService(
     private val creditApplicationRepository: CreditApplicationRepository,
     private val creditDecisionRepository: CreditDecisionRepository,
-    private val webClientBuilder: WebClient.Builder,
-    @Value("\${ML_SERVICE_URL:http://localhost:8000}")
-    private val mlServiceUrl: String
+    private val mlWebClient: WebClient
 ) {
-    private val client = webClientBuilder.baseUrl(mlServiceUrl).build()
-
-
 
     fun saveApplication(entity: ApplicationEntity): ApplicationEntity {
-        entity.creditApplicationId = "APP-${System.currentTimeMillis()}"
-
         return creditApplicationRepository.save(entity)
     }
 
@@ -42,11 +34,8 @@ class CreditApplicationService(
     @Transactional
     fun updateApplication(creditApplicationId: String, updatedData: ApplicationEntity): ApplicationEntity? {
         if (!creditApplicationRepository.existsByCreditApplicationId(creditApplicationId)) {
-            throw RuntimeException(
-                "Application with ID $creditApplicationId not found"
-            )
+            throw RuntimeException("Application with ID $creditApplicationId not found")
         }
-
         return creditApplicationRepository.save(updatedData)
     }
 
@@ -67,7 +56,7 @@ class CreditApplicationService(
     }
 
     private fun callPythonModel(application: CreditApplication): DecisionResponse? {
-        return client.post()
+        return mlWebClient.post()
             .uri("/predict")
             .bodyValue(application)
             .retrieve()
@@ -90,13 +79,15 @@ class CreditApplicationService(
         val response = callPythonModel(applicationForModel)
             ?: throw RuntimeException("FastAPI returned no response")
 
+        val modelVersionFromResponse = response.modelVersion
+
         val savedDecision = creditDecisionRepository.save(
             DecisionEntity(
                 application = appEntity,
                 probability = response.probability,
                 isRisky = response.isRisky,
                 decision = response.decision,
-                modelVersion = "xgb_v1",
+                modelVersion = modelVersionFromResponse,
                 createdAt = LocalDateTime.now()
             )
         )

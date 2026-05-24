@@ -31,5 +31,13 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - ML_SERVICE_URL=http://ml-api:8000
 
+  frontend-service:
+    build: ./frontend-service
+    container_name: react-ui
+    depends_on:
+      - backend-service
+    ports:
+      - "3000:80"
+
 volumes:
   db_data:

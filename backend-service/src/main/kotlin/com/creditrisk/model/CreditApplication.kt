@@ -47,7 +47,8 @@ data class CreditApplication(
 
     @get:JsonProperty("NumberOfDependents")
     @field:PositiveOrZero
-    val numberOfDependents: Int? = null
+    val numberOfDependents: Int? = null,
+    val decisions: List<DecisionResponse> = emptyList()
 ){
     fun toEntity(): ApplicationEntity {
         return ApplicationEntity(

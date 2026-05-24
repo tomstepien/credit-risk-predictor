@@ -17,7 +17,7 @@ data class ApplicationEntity(
     val id: Long? = null,
 
     @Column(unique = true, nullable = false, name = "application_id")
-    var creditApplicationId: String,
+    var creditApplicationId: String = "",
     val age: Int,
     val monthlyIncome: Double?,
     val debtRatio: Double,
@@ -32,6 +32,14 @@ data class ApplicationEntity(
     @OneToMany(mappedBy = "application", cascade = [CascadeType.ALL])
     val decisions: List<DecisionEntity> = mutableListOf()
 ){
+    @jakarta.persistence.PrePersist
+    fun ensureBusinessId() {
+        if (this.creditApplicationId.isBlank()) {
+            val uniqueToken = java.util.UUID.randomUUID().toString().substring(0, 8)
+            this.creditApplicationId = "APP-$uniqueToken"
+        }
+    }
+
     fun toDto(): CreditApplication{
         return CreditApplication(
             creditApplicationId = this.creditApplicationId,
@@ -44,7 +52,8 @@ data class ApplicationEntity(
             monthlyIncome = this.monthlyIncome,
             openCreditLines = this.openCreditLines,
             realEstateLoans = this.realEstateLoans,
-            numberOfDependents = this.numberOfDependents
+            numberOfDependents = this.numberOfDependents,
+            decisions = this.decisions.map { it.toDto() }
         )
     }
 }
