@@ -6,7 +6,7 @@ A functional prototype of a credit scoring system, demonstrating how to bridge t
 
 ---
 
-## 🧪 Data Science & Research (The "Brain")
+## 🧪 Data Science & Research
 The development process was preceded by an in-depth data exploration phase. This ensures that the model architecture and features are strictly data-driven and based on verified statistical insights.
 
 **Key research steps found in [`/ml-service/notebooks`](./ml-service/notebooks):**
@@ -21,8 +21,9 @@ The development process was preceded by an in-depth data exploration phase. This
 
 | Domain | Tools                                          |
 | :--- |:-----------------------------------------------|
-| **Data Science** | Python, XGBoost, Scikit-learn, Pandas, Jupyter |
+| **Frontend** | React, TypeScript, Vite, CSS                   |
 | **Backend** | Kotlin (JVM), Spring Boot, FastAPI             |
+| **Data Science** | Python, XGBoost, Scikit-learn, Pandas, Jupyter |
 | **Database** | PostgreSQL                                     |
 | **Infrastructure** | Docker, Docker Compose                         |
 
@@ -31,45 +32,47 @@ The development process was preceded by an in-depth data exploration phase. This
 ## 📈 Project Roadmap & Milestones
 
 ### 🟢 Sprint 1: ML Core (Python) - COMPLETED ✅
-- [x] Data exploration (EDA) and feature engineering in Jupyter Notebooks.
-- [x] Model training and serialization using `joblib`.
+- [x] Data exploration (EDA) and **feature engineering** in Jupyter Notebooks.
+- [x] **Model training** and serialization using joblib.
 - [x] Building a RESTful Inference API with **FastAPI** and **Pydantic** validation.
 
-### 🔵 Sprint 2: Business Logic & Persistence (Kotlin) - IN PROGRESS 🏗️
-- [x] **Current:** Initializing **Spring Boot 3** project with Kotlin.
-- [x] Designing the PostgreSQL schema and JPA Entities.
-- [ ] Implementing the `MLClient` to communicate with the FastAPI service.
+### 🔵 Sprint 2: Business Logic & Persistence (Kotlin) -  COMPLETED ✅
+- [x] Initializing **Spring Boot 3** project with Kotlin.
+- [x] Designing the **PostgreSQL** schema and JPA Entities.
+- [x] Implementing the MLClient via **Spring WebClient** to asynchronously communicate with the FastAPI service.
 
-### 🟡 Sprint 3: Infrastructure & UX (DevOps & React) - PLANNED 📅
-- [ ] **Dockerization:** Creating Multi-stage Dockerfiles for Python, Kotlin, and React.
-- [ ] **Orchestration:** Setting up `docker-compose` for the entire microservice ecosystem.
-- [ ] **Frontend:** Building a React + TypeScript dashboard for real-time risk simulation.
+### 🟡 Sprint 3: Infrastructure & UX (DevOps & React) - COMPLETED ✅
+- [x] Multi-stage **Dockerfiles** for Python, Kotlin, and React web application.
+- [x] Setting up production-ready **docker-compose** for the entire microservice ecosystem.
+- [x] Implementing a **React** + **TypeScript** UI to handle evaluation forms and database lookup
 ---
 
-## 🚀 Getting Started (Integrated Backend & ML)
+## 🚀 Getting Started (Run the Whole Ecosystem)
 
-The easiest way to run the entire ecosystem (Kotlin Backend, Python ML Service, and PostgreSQL) is via Docker Compose.
+The entire microservice ecosystem (React WebApp, Kotlin Backend, Python ML Service, and PostgreSQL) is fully containerized and automated via Docker Compose.
 
 ### Quick Start
-1. Ensure you have Docker installed.
-2. From the project root, run:
+1. Ensure you have Docker and Docker Compose installed.
+2. From the project root, build and spin up all services:
    ```bash
    docker-compose up --build
    ```
+3. Once the containers are healthy, open your browser and navigate to:
+   ```bash
+   http://localhost:3000
+   ```
 
-### 🧪 Testing the API
-Now you can test the full integration flow: Client -> Kotlin Backend -> Python ML -> PostgreSQL.
+## 🔍 Testing the API Directly (via Postman)
+You can test the full integration flow: Client -> Kotlin Backend -> Python ML -> PostgreSQL.
 
-#### Full Integration Test (via Postman)
-   Use this endpoint to trigger the entire logic. The Kotlin backend will call the ML engine and persist the results in the database.
+The Kotlin backend acts as an API Gateway — it receives the request, queries the ML engine, persists the logs in PostgreSQL, and returns the scoring result.
+* **Method**:```POST``` 
 
-- Open **Postman** and create a new ```POST``` request
+* **URL**: ```http://localhost:8080/api/credit/applications/predict```
 
-- **URL**: ```http://localhost:8080/api/credit/applications/predict```
+* **Body**: ```raw``` -> ```JSON```
 
-- In the **Body** tab, select **raw** and choose **JSON**.
-
-- **Example Payload (JSON)**:
+* **Example Payload (JSON)**:
 
 ```json
 {
@@ -86,14 +89,9 @@ Now you can test the full integration flow: Client -> Kotlin Backend -> Python M
 }
 ```
 
-#### Database & History Verification
-   Verify that the data has been correctly saved and processed:
+### 📊 Database & History Verification
+Verify that the data has been correctly saved and processed:
 
-- **All Applications**: ```GET http://localhost:8080/api/credit/applications/all```
+* **All Applications**: ```GET http://localhost:8080/api/credit/applications/all```
 
-- **All Decisions**: ```GET http://localhost:8080/api/credit/decisions/all```
-
-#### Independent ML Testing (Swagger)
-   To test the Python ML engine independently (bypassing the Kotlin backend)
-
-- **Swagger UI URL**: ```http://localhost:8000/docs```
+* **All Decisions**: ```GET http://localhost:8080/api/credit/decisions/all```
