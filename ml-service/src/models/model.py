@@ -1,10 +1,13 @@
 import joblib
 import os
-from sklearn.pipeline import Pipeline
+
+DEFAULT_THRESHOLD = 0.39
+MODEL_VERSION = os.getenv("MODEL_VERSION", "xgb_v1")
+
 
 class Model:
     def __init__(self, pipeline=None):
-            self.pipeline = pipeline
+        self.pipeline = pipeline
 
     def train_final(self, X_train, y_train):
         if self.pipeline is None:
@@ -14,7 +17,7 @@ class Model:
     def predict_proba(self, X):
         return self.pipeline.predict_proba(X)[:, 1]
 
-    def predict(self, X, threshold=0.39):
+    def predict(self, X, threshold=DEFAULT_THRESHOLD):
         probabilities = self.predict_proba(X)
         return (probabilities > threshold).astype(int)
 

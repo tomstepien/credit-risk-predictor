@@ -1,5 +1,6 @@
 package com.creditrisk.model
 
+import com.fasterxml.jackson.annotation.JsonAlias
 import com.fasterxml.jackson.annotation.JsonFormat
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
@@ -13,7 +14,8 @@ data class DecisionResponse(
     val isRisky: Boolean,
 
     val decision: String,
-    val modelVersion: String = "xgb_v1",
+    @field:JsonAlias("model_version")
+    val modelVersion: String = "unknown",
 
     @field:JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     val createdAt: LocalDateTime? = null,

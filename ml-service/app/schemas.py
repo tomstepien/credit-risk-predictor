@@ -1,8 +1,10 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional
 
 
 class CreditApplication(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     credit_application_id: str = Field(alias="creditApplicationId")
     revolving_utilization: float = Field(alias="RevolvingUtilizationOfUnsecuredLines")
     age: int
@@ -31,10 +33,7 @@ class CreditApplication(BaseModel):
                 continue
 
             if value is not None and isinstance(value, (int, float)) and value < 0:
-                alias = self.model_fields[field_name].alias or field_name
+                alias = type(self).model_fields[field_name].alias or field_name
                 raise ValueError(f"Value for field '{alias}' cannot be negative (provided: {value}).")
 
         return self
-
-    class Config:
-        populate_by_name = True

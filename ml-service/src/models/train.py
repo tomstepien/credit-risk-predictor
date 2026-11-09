@@ -2,18 +2,19 @@ from skopt import BayesSearchCV
 from sklearn.model_selection import train_test_split
 from skopt.space import Real, Integer
 from xgboost import XGBClassifier
-from model import Model
 import pandas as pd
 from sklearn.pipeline import Pipeline
-from transformers import Preprocessor, FeatureEngineer
 from sklearn.metrics import roc_auc_score, recall_score, confusion_matrix, precision_score, f1_score
 import os
 
+# Absolute src. imports: the pickled pipeline references src.transformers.*
+from src.models.model import Model, DEFAULT_THRESHOLD
+from src.transformers import Preprocessor, FeatureEngineer
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def evaluate_model(model, X_test, y_test, model_name="Model", threshold=0.39):
+def evaluate_model(model, X_test, y_test, model_name="Model", threshold=DEFAULT_THRESHOLD):
     y_probs = model.predict_proba(X_test)
-    # Using 0.5 as the default threshold
     y_pred = (y_probs > threshold).astype(int)
 
     roc_auc = roc_auc_score(y_test, y_probs)
@@ -90,7 +91,6 @@ def run_training():
     opt.fit(X_train, y_train)
 
     final_model = Model(pipeline=opt.best_estimator_)
-    final_model.train_final(X_train, y_train)
 
     model_save_dir = os.path.join(BASE_DIR, "models")
     os.makedirs(model_save_dir, exist_ok=True)
@@ -98,7 +98,7 @@ def run_training():
     model_save_path = os.path.join(model_save_dir, "xgb_model.joblib")
     final_model.save_model(model_save_path)
 
-    evaluate_model(final_model, X_test, y_test, model_name='xgb_model', threshold=0.39)
+    evaluate_model(final_model, X_test, y_test, model_name='xgb_model', threshold=DEFAULT_THRESHOLD)
 
 if __name__ == "__main__":
     run_training()

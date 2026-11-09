@@ -6,6 +6,31 @@ import type { CreditApplication, PredictionResult, FormErrors } from './types';
 import { CopyableId } from './components/CopyableId';
 import { styles } from './styles';
 
+// Proxied to the backend by nginx (Docker) or Vite (dev)
+const API_BASE = '/api/credit';
+
+const BACKEND_FIELD_TO_FORM: Record<string, keyof FormErrors> = {
+  age: 'age',
+  monthlyIncome: 'MonthlyIncome',
+  debtRatio: 'DebtRatio',
+  revolvingUtilization: 'RevolvingUtilizationOfUnsecuredLines',
+  openCreditLines: 'NumberOfOpenCreditLinesAndLoans',
+  realEstateLoans: 'NumberRealEstateLoansOrLines',
+  numberOfDependents: 'NumberOfDependents',
+  pastDue3059: 'NumberOfTime30-59DaysPastDueNotWorse',
+  pastDue6089: 'NumberOfTime60-89DaysPastDueNotWorse',
+  pastDue90Plus: 'NumberOfTimes90DaysLate',
+};
+
+const mapBackendFieldErrors = (details: Record<string, string>): FormErrors => {
+  const mapped: FormErrors = {};
+  for (const [field, message] of Object.entries(details)) {
+    const key = BACKEND_FIELD_TO_FORM[field];
+    if (key) mapped[key] = message;
+  }
+  return mapped;
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'evaluate' | 'history'>('evaluate');
 
@@ -44,7 +69,7 @@ export default function App() {
       case 'age':
         if (value === 0) error = 'Age is required.';
         else if (value < 18) error = 'Minimum age is 18 years old.';
-        else if (value > 120) error = 'Maximum age is 120 years old.';
+        else if (value > 90) error = 'Maximum age is 90 years old.';
         break;
 
       case 'MonthlyIncome':
@@ -95,7 +120,7 @@ export default function App() {
     setSystemError(null);
 
     try {
-      const response = await axios.post('http://localhost:8080/api/credit/applications/predict', formData);
+      const response = await axios.post(`${API_BASE}/applications/predict`, formData);
       const { decision, probability, is_risky, modelVersion, credit_application_id } = response.data;
 
       setResult({
@@ -106,8 +131,18 @@ export default function App() {
         creditApplicationId: credit_application_id
       });
     } catch (error) {
-      setSystemError('Backend connection error. Please ensure Docker containers are running properly.');
       console.error(error);
+      if (axios.isAxiosError(error) && error.response) {
+        const { status, data } = error.response;
+        if (status === 400 && data?.details) {
+          setFieldErrors(prev => ({ ...prev, ...mapBackendFieldErrors(data.details) }));
+          setSystemError('Some fields were rejected by the server. Please correct them and try again.');
+        } else {
+          setSystemError(`Server error (${status}): ${data?.message ?? 'Unable to process this request.'}`);
+        }
+      } else {
+        setSystemError('Backend connection error. Please ensure Docker containers are running properly.');
+      }
     } finally {
       setLoading(false);
     }
@@ -122,7 +157,7 @@ export default function App() {
     setSearchError(null);
 
     try {
-      const response = await axios.get(`http://localhost:8080/api/credit/applications/${searchId.trim()}`);
+      const response = await axios.get(`${API_BASE}/applications/${encodeURIComponent(searchId.trim())}`);
       setSearchResult(response.data);
     } catch (rawError: unknown) {
       const error = rawError as any;

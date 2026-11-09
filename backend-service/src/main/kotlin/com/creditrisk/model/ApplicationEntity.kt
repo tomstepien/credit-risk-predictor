@@ -7,32 +7,33 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.OneToMany
+import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
 
 @Entity
 @Table(name = "applications")
-data class ApplicationEntity(
+class ApplicationEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
     @Column(unique = true, nullable = false, name = "application_id")
     var creditApplicationId: String = "",
-    val age: Int,
-    val monthlyIncome: Double?,
-    val debtRatio: Double,
-    val revolvingUtilization: Double,
-    val pastDue3059: Int,
-    val pastDue6089: Int,
-    val pastDue90Plus: Int,
-    val realEstateLoans: Int,
-    val numberOfDependents: Int?,
-    val openCreditLines: Int,
+    var age: Int,
+    var monthlyIncome: Double?,
+    var debtRatio: Double,
+    var revolvingUtilization: Double,
+    var pastDue3059: Int,
+    var pastDue6089: Int,
+    var pastDue90Plus: Int,
+    var realEstateLoans: Int,
+    var numberOfDependents: Int?,
+    var openCreditLines: Int,
 
     @OneToMany(mappedBy = "application", cascade = [CascadeType.ALL])
-    val decisions: List<DecisionEntity> = mutableListOf()
-){
-    @jakarta.persistence.PrePersist
+    val decisions: MutableList<DecisionEntity> = mutableListOf()
+) {
+    @PrePersist
     fun ensureBusinessId() {
         if (this.creditApplicationId.isBlank()) {
             val uniqueToken = java.util.UUID.randomUUID().toString().substring(0, 8)
@@ -40,7 +41,32 @@ data class ApplicationEntity(
         }
     }
 
-    fun toDto(): CreditApplication{
+    fun updateFrom(dto: CreditApplication) {
+        age = dto.age
+        monthlyIncome = dto.monthlyIncome
+        debtRatio = dto.debtRatio
+        revolvingUtilization = dto.revolvingUtilization
+        pastDue3059 = dto.pastDue3059
+        pastDue6089 = dto.pastDue6089
+        pastDue90Plus = dto.pastDue90Plus
+        realEstateLoans = dto.realEstateLoans
+        numberOfDependents = dto.numberOfDependents
+        openCreditLines = dto.openCreditLines
+    }
+
+    fun hasSameInputsAs(dto: CreditApplication): Boolean =
+        age == dto.age &&
+            monthlyIncome == dto.monthlyIncome &&
+            debtRatio == dto.debtRatio &&
+            revolvingUtilization == dto.revolvingUtilization &&
+            pastDue3059 == dto.pastDue3059 &&
+            pastDue6089 == dto.pastDue6089 &&
+            pastDue90Plus == dto.pastDue90Plus &&
+            realEstateLoans == dto.realEstateLoans &&
+            numberOfDependents == dto.numberOfDependents &&
+            openCreditLines == dto.openCreditLines
+
+    fun toDto(): CreditApplication {
         return CreditApplication(
             creditApplicationId = this.creditApplicationId,
             revolvingUtilization = this.revolvingUtilization,

@@ -1,6 +1,7 @@
 package com.creditrisk.services
 
 import com.creditrisk.dataSources.CreditDecisionRepository
+import com.creditrisk.exception.NotFoundException
 import com.creditrisk.model.DecisionEntity
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
@@ -18,7 +19,7 @@ class CreditDecisionService(
     @Transactional
     fun deleteDecision(id: Long) {
         if (!creditDecisionRepository.existsById(id)) {
-            throw RuntimeException("Decision not found")
+            throw NotFoundException("Decision with ID $id not found")
         }
         creditDecisionRepository.deleteById(id)
     }

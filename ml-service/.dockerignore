@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+.DS_Store
+.ipynb_checkpoints/
+
+notebooks/
+data/
+predictions/
+requirements-dev.txt

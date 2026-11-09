@@ -1,17 +1,16 @@
-import os
-import logging
-import sys
-import joblib
-import pandas as pd
-from fastapi import FastAPI, HTTPException, UploadFile, File
 import io
-from app.schemas import CreditApplication
-from src.models.model import Model
-import src.models.predict as predict_module
+import logging
+import os
+import sys
 from contextlib import asynccontextmanager
 from typing import Optional
-import uvicorn
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pandas as pd
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
+
+from app.schemas import CreditApplication
+from src.models.model import DEFAULT_THRESHOLD, MODEL_VERSION, Model
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 model_pipeline: Optional[Model] = None
@@ -19,9 +18,7 @@ model_pipeline: Optional[Model] = None
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("ml-service")
 
@@ -36,8 +33,9 @@ COLUMNS_ORDER = [
     "NumberOfTimes90DaysLate",
     "NumberRealEstateLoansOrLines",
     "NumberOfTime60-89DaysPastDueNotWorse",
-    "NumberOfDependents"
+    "NumberOfDependents",
 ]
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,119 +43,95 @@ async def lifespan(app: FastAPI):
     model_path = os.path.join(BASE_DIR, "models", "xgb_model.joblib")
 
     if not os.path.exists(model_path):
-        logger.info(f"❌ CRITICAL: Model file not found at {model_path}")
+        logger.error(f"Model file not found at {model_path}")
     else:
         try:
             model_pipeline = Model.load_model(model_path)
-            logger.info("🚀 Model loaded successfully!")
-        except Exception as e:
-            logger.info(f"❌ Failed to load model: {e}")
+            logger.info(f"Model loaded successfully (version={MODEL_VERSION}, threshold={DEFAULT_THRESHOLD})")
+        except Exception:
+            logger.exception("Failed to load model")
 
     yield
     logger.info("Shutting down...")
+
 
 app = FastAPI(
     lifespan=lifespan,
     title="CreditRiskPredictor",
 )
 
+
+def _require_model() -> Model:
+    if model_pipeline is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return model_pipeline
+
+
+def _to_result(application_id: str, probability: float) -> dict:
+    is_risky = probability > DEFAULT_THRESHOLD
+    return {
+        "credit_application_id": application_id,
+        "probability": round(probability, 4),
+        "is_risky": is_risky,
+        "decision": "REJECT" if is_risky else "APPROVE",
+        "model_version": MODEL_VERSION,
+    }
+
+
+def _score(df: pd.DataFrame) -> list[float]:
+    model = _require_model()
+    try:
+        return [float(p) for p in model.predict_proba(df[COLUMNS_ORDER])]
+    except Exception as e:
+        logger.exception("Prediction failed")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+
+
 @app.get("/health")
 def health_check():
-    return {
-        "status": "alive" if model_pipeline else "unstable",
-        "model_loaded": model_pipeline is not None
-    }
+    loaded = model_pipeline is not None
+    body = {"status": "alive" if loaded else "unstable", "model_loaded": loaded, "model_version": MODEL_VERSION}
+    return JSONResponse(content=body, status_code=200 if loaded else 503)
+
 
 @app.post("/predict")
 def predict(payload: CreditApplication):
-    if model_pipeline is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+    raw = payload.model_dump(by_alias=True, exclude={"credit_application_id"})
+    probability = _score(pd.DataFrame([raw]))[0]
+    return _to_result(payload.credit_application_id, probability)
 
-    try:
-        raw_data = payload.model_dump(by_alias=True, exclude={"credit_application_id"})
-
-        df = pd.DataFrame([raw_data])
-        df = df[COLUMNS_ORDER]
-
-        probability = model_pipeline.predict_proba(df)
-        prob_value = float(probability[0])
-
-        return {
-            "credit_application_id": payload.credit_application_id,
-            "probability": round(prob_value, 4),
-            "is_risky": bool(prob_value > predict_module.threshold),
-            "decision": "REJECT" if prob_value > predict_module.threshold else "APPROVE"
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 @app.post("/predict-batch")
 def predict_batch(payload: list[CreditApplication]):
-    if model_pipeline is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+    if not payload:
+        return []
+    rows = [item.model_dump(by_alias=True, exclude={"credit_application_id"}) for item in payload]
+    probabilities = _score(pd.DataFrame(rows))
+    return [_to_result(item.credit_application_id, p) for item, p in zip(payload, probabilities)]
 
-    try:
-        raw_data_list = [data.model_dump(by_alias=True, exclude={"credit_application_id"}) for data in payload]
-
-        df = pd.DataFrame(raw_data_list)
-        df = df[COLUMNS_ORDER]
-
-        probabilities = model_pipeline.predict_proba(df)
-
-        results = []
-        for i, probability in enumerate(probabilities):
-            prob_val = float(probability)
-            results.append({
-                "credit_application_id": payload[i].credit_application_id,
-                "probability": round(prob_val, 4),
-                "is_risky": bool(prob_val > predict_module.threshold),
-                "decision": "REJECT" if prob_val > predict_module.threshold else "APPROVE"
-            })
-
-        return results
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 @app.post("/predict-csv")
 async def predict_csv(file: UploadFile = File(...)):
-    if model_pipeline is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+    _require_model()
 
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="File extension not allowed")
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are allowed")
 
     try:
-        contents = await file.read()
-        df = pd.read_csv(io.BytesIO(contents))
-
-        missing_cols = [c for c in COLUMNS_ORDER if c not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing columns in CSV: {missing_cols}")
-
-        X = df[COLUMNS_ORDER]
-
-        probabilities = model_pipeline.predict_proba(X)
-
-        results = []
-        for i, probability in enumerate(probabilities):
-            app_id = df.iloc[i].get('credit_application_id', f"row_{i}")
-            prob_val = float(probability)
-            
-            results.append({
-                "credit_application_id": str(app_id),
-                "probability": round(prob_val, 4),
-                "is_risky": bool(prob_val > predict_module.threshold),
-                "decision": "REJECT" if prob_val > predict_module.threshold else "APPROVE"
-            })
-
-        return results
-
+        df = pd.read_csv(io.BytesIO(await file.read()))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Could not parse CSV: {e}")
+
+    missing_cols = [c for c in COLUMNS_ORDER if c not in df.columns]
+    if missing_cols:
+        raise HTTPException(status_code=400, detail=f"Missing columns in CSV: {missing_cols}")
+
+    probabilities = _score(df)
+    ids = df["credit_application_id"].astype(str) if "credit_application_id" in df.columns else [f"row_{i}" for i in range(len(df))]
+    return [_to_result(app_id, p) for app_id, p in zip(ids, probabilities)]
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -1,25 +1,20 @@
 package com.creditrisk.controllers
 
+import com.creditrisk.exception.NotFoundException
 import com.creditrisk.model.CreditApplication
+import com.creditrisk.model.DecisionResponse
 import com.creditrisk.services.CreditApplicationService
 import jakarta.validation.Valid
-import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.CrossOrigin
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
-import com.creditrisk.model.DecisionResponse
+import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import org.springframework.web.server.ResponseStatusException
 
 @RestController
 @RequestMapping("/api/credit/applications")
-@CrossOrigin(origins = ["*"])
 class CreditApplicationController(
-    private val creditApplicationService: CreditApplicationService
+    private val creditApplicationService: CreditApplicationService,
+    private val healthEndpoint: HealthEndpoint
 ) {
     @PostMapping("/predict")
     fun predict(
@@ -30,10 +25,11 @@ class CreditApplicationController(
 
     @GetMapping("/status")
     fun getStatus(): ResponseEntity<Map<String, String>> {
+        val dbStatus = healthEndpoint.healthForPath("db")?.status?.code ?: "UNKNOWN"
         return ResponseEntity.ok(mapOf(
             "service" to "Backend Service",
             "status" to "Running",
-            "database" to "Connected"
+            "database" to dbStatus
         ))
     }
 
@@ -44,32 +40,22 @@ class CreditApplicationController(
 
     @GetMapping("/{id}")
     fun getApplication(@PathVariable id: String): CreditApplication {
-        val app = creditApplicationService.getApplication(id)
-
-        return app?.toDto() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found")
+        return creditApplicationService.getApplication(id)?.toDto()
+            ?: throw NotFoundException("Application not found")
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun createApplication(@RequestBody app: CreditApplication): CreditApplication {
-        val entityToSave = app.toEntity()
-
-        val savedEntity = creditApplicationService.saveApplication(entityToSave)
-
-        return savedEntity.toDto()
+    fun createApplication(@Valid @RequestBody app: CreditApplication): CreditApplication {
+        return creditApplicationService.saveApplication(app.toEntity()).toDto()
     }
 
     @PutMapping("/{id}")
     fun updateApplication(
         @PathVariable id: String,
-        @RequestBody updatedData: CreditApplication
+        @Valid @RequestBody updatedData: CreditApplication
     ): CreditApplication {
-        val entity = updatedData.toEntity()
-
-        val updatedEntity = creditApplicationService.updateApplication(id, entity)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found")
-
-        return updatedEntity.toDto()
+        return creditApplicationService.updateApplication(id, updatedData).toDto()
     }
 
     @DeleteMapping("/internal/{id}")

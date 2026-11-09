@@ -1,8 +1,8 @@
 import pandas as pd
 import os
-from src.models.model import Model
+from src.models.model import Model, DEFAULT_THRESHOLD
 
-threshold = 0.39
+threshold = DEFAULT_THRESHOLD
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def run_prediction(input_data_path=None, output_path=None):

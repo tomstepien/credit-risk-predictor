@@ -2,11 +2,12 @@ package com.creditrisk.services
 
 import com.creditrisk.dataSources.CreditApplicationRepository
 import com.creditrisk.dataSources.CreditDecisionRepository
+import com.creditrisk.exception.ConflictException
+import com.creditrisk.exception.NotFoundException
 import com.creditrisk.model.ApplicationEntity
 import com.creditrisk.model.CreditApplication
 import com.creditrisk.model.DecisionEntity
 import com.creditrisk.model.DecisionResponse
-import jakarta.persistence.EntityNotFoundException
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -32,17 +33,17 @@ class CreditApplicationService(
     }
 
     @Transactional
-    fun updateApplication(creditApplicationId: String, updatedData: ApplicationEntity): ApplicationEntity? {
-        if (!creditApplicationRepository.existsByCreditApplicationId(creditApplicationId)) {
-            throw RuntimeException("Application with ID $creditApplicationId not found")
-        }
-        return creditApplicationRepository.save(updatedData)
+    fun updateApplication(creditApplicationId: String, updatedData: CreditApplication): ApplicationEntity {
+        val existing = getApplication(creditApplicationId)
+            ?: throw NotFoundException("Application with ID $creditApplicationId not found")
+        existing.updateFrom(updatedData)
+        return existing
     }
 
     @Transactional
     fun deleteByInternalId(id: Long) {
         if (!creditApplicationRepository.existsById(id)) {
-            throw EntityNotFoundException("Application with internal ID $id not found")
+            throw NotFoundException("Application with internal ID $id not found")
         }
         creditApplicationRepository.deleteById(id)
     }
@@ -50,7 +51,7 @@ class CreditApplicationService(
     @Transactional
     fun deleteByBusinessId(businessId: String) {
         if (!creditApplicationRepository.existsByCreditApplicationId(businessId)) {
-            throw EntityNotFoundException("Application with business ID $businessId not found")
+            throw NotFoundException("Application with business ID $businessId not found")
         }
         creditApplicationRepository.deleteByCreditApplicationId(businessId)
     }
@@ -66,20 +67,23 @@ class CreditApplicationService(
 
     @Transactional
     fun processApplication(application: CreditApplication): DecisionResponse {
-        val requestId = application.creditApplicationId
+        val requestId = application.creditApplicationId?.takeIf { it.isNotBlank() }
+        val existing = requestId?.let { getApplication(it) }
 
-        val appEntity = if (requestId != null) {
-            getApplication(requestId) ?: saveApplication(application.toEntity())
-        } else {
-            saveApplication(application.toEntity())
+        // Re-scoring an existing application is allowed only with unchanged inputs
+        if (existing != null && !existing.hasSameInputsAs(application)) {
+            throw ConflictException(
+                "Application $requestId already exists with different data. " +
+                    "Update it with PUT /api/credit/applications/$requestId or submit without an ID."
+            )
         }
 
-        val applicationForModel = application.copy(creditApplicationId = appEntity.creditApplicationId)
+        val appEntity = existing ?: saveApplication(application.toEntity())
+
+        val applicationForModel = appEntity.toDto().copy(decisions = emptyList())
 
         val response = callPythonModel(applicationForModel)
-            ?: throw RuntimeException("FastAPI returned no response")
-
-        val modelVersionFromResponse = response.modelVersion
+            ?: throw IllegalStateException("ML service returned an empty response")
 
         val savedDecision = creditDecisionRepository.save(
             DecisionEntity(
@@ -87,7 +91,7 @@ class CreditApplicationService(
                 probability = response.probability,
                 isRisky = response.isRisky,
                 decision = response.decision,
-                modelVersion = modelVersionFromResponse,
+                modelVersion = response.modelVersion,
                 createdAt = LocalDateTime.now()
             )
         )

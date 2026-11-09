@@ -39,7 +39,7 @@ The development process was preceded by an in-depth data exploration phase. This
 ### 🔵 Sprint 2: Business Logic & Persistence (Kotlin) -  COMPLETED ✅
 - [x] Initializing **Spring Boot 3** project with Kotlin.
 - [x] Designing the **PostgreSQL** schema and JPA Entities.
-- [x] Implementing the MLClient via **Spring WebClient** to asynchronously communicate with the FastAPI service.
+- [x] Implementing the MLClient via **Spring WebClient** to communicate with the FastAPI service (currently a blocking call).
 
 ### 🟡 Sprint 3: Infrastructure & UX (DevOps & React) - COMPLETED ✅
 - [x] Multi-stage **Dockerfiles** for Python, Kotlin, and React web application.
@@ -52,15 +52,37 @@ The development process was preceded by an in-depth data exploration phase. This
 The entire microservice ecosystem (React WebApp, Kotlin Backend, Python ML Service, and PostgreSQL) is fully containerized and automated via Docker Compose.
 
 ### Quick Start
-1. Ensure you have Docker and Docker Compose installed.
-2. From the project root, build and spin up all services:
+1. Ensure you have Docker with the Compose plugin installed.
+2. Create your local environment file (Compose refuses to start without it):
    ```bash
-   docker-compose up --build
+   cp .env.example .env
    ```
-3. Once the containers are healthy, open your browser and navigate to:
+3. From the project root, build and spin up all services:
    ```bash
+   docker compose up --build
+   ```
+   Services start in order thanks to healthchecks: PostgreSQL and the ML service first, then the backend, then the UI.
+4. Once the containers are healthy (`docker compose ps`), open your browser and navigate to:
+   ```
    http://localhost:3000
    ```
+
+| Service | URL |
+| :--- | :--- |
+| React UI (proxies `/api` to the backend) | http://localhost:3000 |
+| Kotlin backend | http://localhost:8080 (health: `/actuator/health`) |
+| FastAPI ML service | http://localhost:8000 (Swagger UI: `/docs`, health: `/health`) |
+| PostgreSQL | `localhost:5435` |
+
+### Training the model (optional)
+The trained model is committed in `ml-service/models/xgb_model.joblib`. To retrain it, put the Kaggle
+"Give Me Some Credit" files in `ml-service/data/raw/` and run from `ml-service/`:
+```bash
+pip install -r requirements-dev.txt
+```
+```bash
+python -m src.models.train
+```
 
 ## 🔍 Testing the API Directly (via Postman)
 You can test the full integration flow: Client -> Kotlin Backend -> Python ML -> PostgreSQL.
@@ -95,3 +117,12 @@ Verify that the data has been correctly saved and processed:
 * **All Applications**: ```GET http://localhost:8080/api/credit/applications/all```
 
 * **All Decisions**: ```GET http://localhost:8080/api/credit/decisions/all```
+
+### ⚠️ Error responses
+| Status | When |
+| :--- | :--- |
+| `400` | Request validation failed (`details` lists the invalid fields) |
+| `404` | Application / decision not found |
+| `409` | `credit_application_id` already exists with different input data (update it with `PUT` instead) |
+| `422` | The ML service rejected the input |
+| `502` / `503` | The ML service failed / is unreachable |

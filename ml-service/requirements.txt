@@ -1,12 +1,11 @@
-pandas
-numpy
-scikit-learn
-xgboost
-matplotlib
-seaborn
-kaggle
-xlrd
-pydantic
-fastapi
-uvicorn
-python-multipart
+# Pinned to the training env of models/xgb_model.joblib (sklearn and xgboost must match it)
+scikit-learn==1.8.0
+xgboost==3.2.0
+numpy==2.4.3
+pandas==3.0.1
+scipy==1.17.1
+joblib==1.5.3
+fastapi==0.136.1
+pydantic==2.13.3
+uvicorn==0.46.0
+python-multipart==0.0.26
